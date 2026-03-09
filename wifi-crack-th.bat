@@ -227,14 +227,14 @@ echo [*] Attack Mode: Dictionary with rules (-a 0 -r)
 echo [*] Estimated Time: 5-15 minutes (14M x 64 rules = 896M+ combinations)
 echo.
 if exist rockyou.txt (
-    if exist rules\best64.rule (
+    if exist rules\best66.rule (
         echo [*] Running Phase 2... (This may take 5-15 minutes)
-        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% rockyou.txt -r rules\best64.rule
+        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% rockyou.txt -r rules\best66.rule
         echo.
         call :check_cracked
     ) else (
-        echo [!] rules\best64.rule not found - skipping this phase
-        echo [!] Usually located in hashcat installation: hashcat\rules\best64.rule
+        echo [!] rules\best66.rule not found - skipping this phase
+        echo [!] Usually located in hashcat installation: hashcat\rules\best66.rule
         echo.
     )
 ) else (

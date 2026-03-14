@@ -72,45 +72,6 @@ if not exist thaiprefix.txt (
 goto start_cracking
 
 :: ===================================================
-:: FUNCTION: CHECK IF PASSWORD CRACKED
-:: ===================================================
-:check_cracked
-:: Check with --show if password exists and has actual output
-hashcat.exe -m 22000 --show %HASHFILE% > temp_result.txt 2>&1
-set CHECK_OUTPUT=
-for /f "delims=" %%i in (temp_result.txt) do set CHECK_OUTPUT=%%i
-
-if not "!CHECK_OUTPUT!"=="" (
-    findstr /C:":" temp_result.txt >nul 2>&1
-    if !errorlevel! equ 0 (
-        set END_TIME=%time%
-        call :calculate_duration
-        echo.
-        echo ===================================================
-        echo   PASSWORD FOUND - CRACKING SUCCESSFUL
-        echo ===================================================
-        echo.
-        echo [RESULT] Password recovered:
-        echo ------------------------------------------------
-        type temp_result.txt
-        echo ------------------------------------------------
-        echo.
-        echo ===================================================
-        echo [SUCCESS] Password saved to hashcat.potfile
-        echo [TIME] Total duration: !DURATION!
-        echo [STARTED] %START_TIME%
-        echo [FINISHED] %END_TIME%
-        echo ===================================================
-        echo.
-        del temp_result.txt >nul 2>&1
-        pause
-        exit /b 0
-    )
-)
-del temp_result.txt >nul 2>&1
-goto :eof
-
-:: ===================================================
 :: FUNCTION: CALCULATE DURATION
 :: ===================================================
 :calculate_duration
@@ -158,38 +119,6 @@ goto :eof
 :start_cracking
 
 :: ===================================================
-:: CHECK IF ALREADY CRACKED
-:: ===================================================
-echo [*] Checking if password already cracked...
-hashcat.exe -m 22000 --show %HASHFILE% > temp_check.txt 2>&1
-set /p CHECK_RESULT=<temp_check.txt
-
-if not "!CHECK_RESULT!"=="" (
-    findstr /C:":" temp_check.txt >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo.
-        echo ===================================================
-        echo   PASSWORD ALREADY CRACKED (Found in potfile)
-        echo ===================================================
-        echo.
-        echo [RESULT] Password recovered:
-        echo ------------------------------------------------
-        type temp_check.txt
-        echo ------------------------------------------------
-        echo.
-        echo [INFO] This hash was cracked in a previous session
-        echo [INFO] No need to run cracking again
-        echo.
-        del temp_check.txt >nul 2>&1
-        pause
-        exit /b 0
-    )
-)
-del temp_check.txt >nul 2>&1
-echo [+] No previous results found - starting cracking sequence...
-echo.
-
-:: ===================================================
 :: PHASE 1: DICTIONARY ATTACK (ROCKYOU)
 :: ===================================================
 echo.
@@ -203,13 +132,11 @@ echo [*] Attack Mode: Straight dictionary (-a 0)
 echo [*] Estimated Time: 1-5 minutes (14M+ passwords)
 echo.
 if exist rockyou.txt (
-    echo [*] Running Phase 1... (This may take 1-5 minutes)
-    hashcat.exe -m 22000 -a 0 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% rockyou.txt
+    echo [*] Running Phase 1...
+    hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %HASHFILE% rockyou.txt
     echo.
-    call :check_cracked
 ) else (
-    echo [!] rockyou.txt not found - skipping this phase
-    echo [!] Download from: https://github.com/brannondorsey/naive-hashcat/releases
+    echo [!] rockyou.txt not found - skipping
     echo.
 )
 
@@ -227,18 +154,16 @@ echo [*] Attack Mode: Dictionary with rules (-a 0 -r)
 echo [*] Estimated Time: 5-15 minutes (14M x 64 rules = 896M+ combinations)
 echo.
 if exist rockyou.txt (
-    if exist rules\best66.rule (
-        echo [*] Running Phase 2... (This may take 5-15 minutes)
-        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% rockyou.txt -r rules\best66.rule
+    if exist rules\best64.rule (
+        echo [*] Running Phase 2...
+        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %HASHFILE% rockyou.txt -r rules\best64.rule
         echo.
-        call :check_cracked
     ) else (
-        echo [!] rules\best66.rule not found - skipping this phase
-        echo [!] Usually located in hashcat installation: hashcat\rules\best66.rule
+        echo [!] rules\best64.rule not found - skipping
         echo.
     )
 ) else (
-    echo [!] rockyou.txt not found - skipping this phase
+    echo [!] rockyou.txt not found - skipping
     echo.
 )
 
@@ -259,7 +184,6 @@ echo [*] Keyspace: 4 year ranges x ~3,650 dates = ~14,600 combinations per range
 echo [*] Estimated Time: 5-10 minutes
 echo.
 if not exist birthdate_patterns.txt (
-    echo [*] Creating birthdate_patterns.txt...
     (
         echo ?d?d?d?d25?d?d
         echo ?d?d?d?d26?d?d
@@ -267,10 +191,9 @@ if not exist birthdate_patterns.txt (
         echo ?d?d?d?d20?d?d
     ) > birthdate_patterns.txt
 )
-echo [*] Running Phase 3... (This may take 5-10 minutes)
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% birthdate_patterns.txt
+echo [*] Running Phase 3...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% birthdate_patterns.txt
 echo.
-call :check_cracked
 
 :: ===================================================
 :: PHASE 4: 8-DIGIT NUMBERS
@@ -286,10 +209,9 @@ echo [*] Attack Mode: Mask attack (-a 3)
 echo [*] Keyspace: 100,000,000 combinations
 echo [*] Estimated Time: 10-30 minutes (depends on GPU)
 echo.
-echo [*] Running Phase 4... (This may take 10-30 minutes)
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% ?d?d?d?d?d?d?d?d
+echo [*] Running Phase 4...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% ?d?d?d?d?d?d?d?d
 echo.
-call :check_cracked
 
 :: ===================================================
 :: PHASE 5: THAI MOBILE NUMBERS (10 DIGITS)
@@ -306,10 +228,9 @@ echo [*] Attack Mode: Mask attack with prefix file (-a 3)
 echo [*] Keyspace: 29 prefixes x 10,000,000 = 290,000,000 combinations
 echo [*] Estimated Time: 30-60 minutes (depends on GPU)
 echo.
-echo [*] Running Phase 5... (This may take 30-60 minutes)
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet --status --status-timer=15 %HASHFILE% thaiprefix.txt
+echo [*] Running Phase 5...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% thaiprefix.txt
 echo.
-call :check_cracked
 
 :: ===================================================
 :: PHASE 6: 9-DIGIT NUMBERS (LAST RESORT)
@@ -327,10 +248,9 @@ echo [*] Estimated Time: 2-8 hours (depends on GPU)
 echo [!] WARNING: This is extremely time-consuming
 echo [!] Consider stopping if previous phases failed
 echo.
-echo [*] Running Phase 6... (This may take 2-8 hours - VERY SLOW)
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet --status --status-timer=30 %HASHFILE% ?d?d?d?d?d?d?d?d?d
+echo [*] Running Phase 6...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% ?d?d?d?d?d?d?d?d?d
 echo.
-call :check_cracked
 
 :: ===================================================
 :: COMPLETION SUMMARY
@@ -340,55 +260,13 @@ call :calculate_duration
 
 echo.
 echo ===================================================
-echo      ALL CRACKING PHASES COMPLETED
+echo      ALL PHASES COMPLETED
 echo ===================================================
-echo.
-echo [TIME] Total duration: %DURATION%
+echo [TIME] Duration: %DURATION%
 echo [STARTED] %START_TIME%
 echo [FINISHED] %END_TIME%
 echo.
-
-:: Final check with --show
-hashcat.exe -m 22000 --show %HASHFILE% > temp_final.txt 2>&1
-set FINAL_OUTPUT=
-for /f "delims=" %%i in (temp_final.txt) do set FINAL_OUTPUT=%%i
-
-if not "!FINAL_OUTPUT!"=="" (
-    findstr /C:":" temp_final.txt >nul 2>&1
-    if !errorlevel! equ 0 (
-        echo [SUCCESS] Password(s) found:
-        echo ------------------------------------------------
-        type temp_final.txt
-        echo ------------------------------------------------
-        echo.
-        echo The password has been saved and can be used to connect to the network.
-        del temp_final.txt >nul 2>&1
-        goto end_script
-    )
-)
-
-del temp_final.txt >nul 2>&1
-echo [FAILED] No passwords found in any phase
-echo.
-echo Recommendations:
-echo - Verify the handshake capture is valid (use aircrack-ng to check)
-echo - Try additional wordlists (Thai-specific, custom dictionaries)
-echo - Use more specific masks based on target information
-echo - Consider combinator attacks (wordlist1 + wordlist2)
-echo - Try additional rule files (dive.rule, rockyou-30000.rule)
-echo - Increase attack complexity (hybrid attacks, longer masks)
-echo.
-echo Common issues:
-echo - Weak/incomplete handshake capture
-echo - Password uses special characters or mixed alphanumeric
-echo - Password length exceeds 9 characters
-echo - Password uses Thai language characters
-
-:end_script
-echo.
-echo ===================================================
-echo STATISTICS
-echo ===================================================
-hashcat.exe --show %HASHFILE% 2>nul
+echo [*] Check results:
+hashcat.exe -m 22000 --show %HASHFILE%
 echo.
 pause

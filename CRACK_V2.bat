@@ -24,6 +24,35 @@ echo ===================================================
 echo.
 
 :: ===================================================
+:: DEVICE SELECTION (GPU/CPU)
+:: ===================================================
+echo [*] Detecting available devices...
+hashcat.exe -I
+echo.
+echo ===================================================
+echo   SELECT PROCESSING DEVICE
+echo ===================================================
+echo.
+echo [1] GPU (Recommended - Fast, requires compatible GPU)
+echo [2] CPU (Slow, works on any system)
+echo [3] Auto (Let Hashcat decide)
+echo.
+set /p DEVICE_CHOICE="Select device (1/2/3): "
+
+if "%DEVICE_CHOICE%"=="1" (
+    set DEVICE_PARAM=-D 2
+    echo [+] Using GPU mode
+) else if "%DEVICE_CHOICE%"=="2" (
+    set DEVICE_PARAM=-D 1
+    echo [!] WARNING: CPU mode is 10-100x slower than GPU
+    echo [!] Some phases may take hours or days to complete
+) else (
+    set DEVICE_PARAM=
+    echo [+] Using Auto mode
+)
+echo.
+
+:: ===================================================
 :: CREATE THAI MOBILE PREFIX FILE
 :: ===================================================
 if not exist thaiprefix.txt (
@@ -133,46 +162,30 @@ echo [*] Estimated Time: 1-5 minutes (14M+ passwords)
 echo.
 if exist rockyou.txt (
     echo [*] Running Phase 1...
-    hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %HASHFILE% rockyou.txt
+    hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
     echo.
 ) else (
-    echo [!] rockyou.txt not found - skipping
-    echo.
-)
-
-:: ===================================================
-:: PHASE 2: DICTIONARY + BEST64 RULES
-:: ===================================================
-echo.
-echo ===================================================
-echo PHASE 2: Dictionary + best64 Rules
-echo Priority: CRITICAL [*****]
-echo ===================================================
-echo [*] Testing dictionary with mutations (case changes, leet speak, suffixes)
-echo [*] Examples: Password123, admin@2024, Welcome!, p@ssw0rd
-echo [*] Attack Mode: Dictionary with rules (-a 0 -r)
-echo [*] Estimated Time: 5-15 minutes (14M x 64 rules = 896M+ combinations)
-echo.
-if exist rockyou.txt (
-    if exist rules\best64.rule (
-        echo [*] Running Phase 2...
-        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %HASHFILE% rockyou.txt -r rules\best64.rule
+    echo [!] rockyou.txt not found - downloading...
+    powershell -Command "Invoke-WebRequest -Uri 'https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt' -OutFile 'rockyou.txt'"
+    if exist rockyou.txt (
+        echo [+] Download complete
+        echo [*] Running Phase 1...
+        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
         echo.
     ) else (
-        echo [!] rules\best64.rule not found - skipping
+        echo [!] Download failed - skipping
         echo.
     )
-) else (
-    echo [!] rockyou.txt not found - skipping
-    echo.
 )
 
+
+
 :: ===================================================
-:: PHASE 3: THAI BIRTHDATE PATTERNS (DDMMYYYY)
+:: PHASE 2: THAI BIRTHDATE PATTERNS (DDMMYYYY)
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 3: Birthdate Patterns (DDMMYYYY)
+echo PHASE 2: Birthdate Patterns (DDMMYYYY)
 echo Priority: HIGH [****]
 echo ===================================================
 echo [*] Testing birthdate patterns in Thai and Western formats
@@ -191,16 +204,16 @@ if not exist birthdate_patterns.txt (
         echo ?d?d?d?d20?d?d
     ) > birthdate_patterns.txt
 )
-echo [*] Running Phase 3...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% birthdate_patterns.txt
+echo [*] Running Phase 2...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% birthdate_patterns.txt
 echo.
 
 :: ===================================================
-:: PHASE 4: 8-DIGIT NUMBERS
+:: PHASE 3: 8-DIGIT NUMBERS
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 4: 8-Digit Numbers (00000000-99999999)
+echo PHASE 3: 8-Digit Numbers (00000000-99999999)
 echo Priority: HIGH [****]
 echo ===================================================
 echo [*] Testing all 8-digit numeric combinations
@@ -209,16 +222,16 @@ echo [*] Attack Mode: Mask attack (-a 3)
 echo [*] Keyspace: 100,000,000 combinations
 echo [*] Estimated Time: 10-30 minutes (depends on GPU)
 echo.
-echo [*] Running Phase 4...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% ?d?d?d?d?d?d?d?d
+echo [*] Running Phase 3...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d
 echo.
 
 :: ===================================================
-:: PHASE 5: THAI MOBILE NUMBERS (10 DIGITS)
+:: PHASE 4: THAI MOBILE NUMBERS (10 DIGITS)
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 5: Thai Mobile Numbers (10 digits)
+echo PHASE 4: Thai Mobile Numbers (10 digits)
 echo Priority: HIGH [****]
 echo ===================================================
 echo [*] Testing Thai mobile phone number patterns
@@ -228,9 +241,36 @@ echo [*] Attack Mode: Mask attack with prefix file (-a 3)
 echo [*] Keyspace: 29 prefixes x 10,000,000 = 290,000,000 combinations
 echo [*] Estimated Time: 30-60 minutes (depends on GPU)
 echo.
-echo [*] Running Phase 5...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% thaiprefix.txt
+echo [*] Running Phase 4...
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% thaiprefix.txt
 echo.
+
+:: ===================================================
+:: PHASE 5: DICTIONARY + BEST66 RULES
+:: ===================================================
+echo.
+echo ===================================================
+echo PHASE 5: Dictionary + best66 Rules
+echo Priority: MEDIUM [***]
+echo ===================================================
+echo [*] Testing dictionary with advanced mutations
+echo [*] Examples: Password123, admin@2024, Welcome!, p@ssw0rd
+echo [*] Attack Mode: Dictionary with rules (-a 0 -r)
+echo [*] Estimated Time: 30-60 minutes
+echo.
+if exist rockyou.txt (
+    if exist rules\best66.rule (
+        echo [*] Running Phase 5...
+        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt -r rules\best66.rule
+        echo.
+    ) else (
+        echo [!] rules\best66.rule not found - skipping
+        echo.
+    )
+) else (
+    echo [!] rockyou.txt not found - skipping
+    echo.
+)
 
 :: ===================================================
 :: PHASE 6: 9-DIGIT NUMBERS (LAST RESORT)
@@ -245,16 +285,15 @@ echo [*] Last resort - exhaustive brute force
 echo [*] Attack Mode: Mask attack (-a 3)
 echo [*] Keyspace: 1,000,000,000 combinations
 echo [*] Estimated Time: 2-8 hours (depends on GPU)
-echo [!] WARNING: This is extremely time-consuming
-echo [!] Consider stopping if previous phases failed
 echo.
 echo [*] Running Phase 6...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %HASHFILE% ?d?d?d?d?d?d?d?d?d
+hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d
 echo.
 
 :: ===================================================
 :: COMPLETION SUMMARY
 :: ===================================================
+:completion_summary
 set END_TIME=%time%
 call :calculate_duration
 

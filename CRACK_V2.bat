@@ -16,24 +16,41 @@ if "%1"=="" (
 
 set HASHFILE=%1
 
-:: Check file extension
-echo %HASHFILE% | findstr /i "\.cap$ \.pcap$" >nul
-if %errorlevel%==0 (
+:: Check file extension for .cap or .pcap
+set "FILENAME=%~nx1"
+set "EXTENSION=%~x1"
+
+if /i "%EXTENSION%"==".cap" goto wrong_format
+if /i "%EXTENSION%"==".pcap" goto wrong_format
+goto format_ok
+
+:wrong_format
+echo.
+echo ===================================================
+echo   WRONG FILE FORMAT DETECTED
+echo ===================================================
+echo.
+echo [ERROR] You provided a %EXTENSION% file: %FILENAME%
+echo [INFO] Hashcat requires .hc22000 format
+echo.
+echo Please convert your file first at:
+echo https://hashcat.net/cap2hashcat/
+echo.
+set /p OPEN_URL="Open conversion website now? (Y/N): "
+if /i "!OPEN_URL!"=="Y" (
+    start https://hashcat.net/cap2hashcat/
+)
+echo.
+echo Press any key to exit...
+pause >nul
+exit /b
+
+:format_ok
+
+:: Check if file exists
+if not exist "%HASHFILE%" (
     echo.
-    echo ===================================================
-    echo   WRONG FILE FORMAT DETECTED
-    echo ===================================================
-    echo.
-    echo [ERROR] You provided a .cap or .pcap file
-    echo [INFO] Hashcat requires .hc22000 format
-    echo.
-    echo Please convert your file first at:
-    echo https://hashcat.net/cap2hashcat/
-    echo.
-    set /p OPEN_URL="Open conversion website now? (Y/N): "
-    if /i "!OPEN_URL!"=="Y" (
-        start https://hashcat.net/cap2hashcat/
-    )
+    echo [ERROR] File not found: %HASHFILE%
     echo.
     pause
     exit /b

@@ -15,42 +15,213 @@ if "%1"=="" (
 )
 
 set HASHFILE=%1
+
+:: Check file extension
+echo %HASHFILE% | findstr /i "\.cap$ \.pcap$" >nul
+if %errorlevel%==0 (
+    echo.
+    echo ===================================================
+    echo   WRONG FILE FORMAT DETECTED
+    echo ===================================================
+    echo.
+    echo [ERROR] You provided a .cap or .pcap file
+    echo [INFO] Hashcat requires .hc22000 format
+    echo.
+    echo Please convert your file first at:
+    echo https://hashcat.net/cap2hashcat/
+    echo.
+    set /p OPEN_URL="Open conversion website now? (Y/N): "
+    if /i "!OPEN_URL!"=="Y" (
+        start https://hashcat.net/cap2hashcat/
+    )
+    echo.
+    pause
+    exit /b
+)
+
 set START_TIME=%time%
+
+:: ===================================================
+:: SETTINGS MENU
+:: ===================================================
+echo.
 echo ===================================================
 echo   HASHCAT WIFI CRACKER - THAI OPTIMIZED
+echo ===================================================
 echo   Target: %HASHFILE%
-echo   Started: %date% %time%
+echo ===================================================
+
+:: ===================================================
+:: SETTINGS MENU
+:: ===================================================
+echo ===================================================
+echo   QUICK START OR SETTINGS?
+echo ===================================================
+echo.
+echo [1] START    - Quick start (Auto GPU, Standard mode)
+echo [2] SETTINGS - Customize device and attack level
+echo.
+echo ===================================================
+set /p START_CHOICE="Your choice (1 or 2): "
 echo ===================================================
 echo.
 
+if "%START_CHOICE%"=="2" goto custom_settings
+
+:: Quick Start - Auto detect GPU, Level 2 (Standard)
+echo [+] Quick start selected
+echo [+] Auto detecting device...
+echo [+] Attack level: STANDARD
+echo.
+timeout /t 2 /nobreak >nul
+set ATTACK_LEVEL=2
+set OPTIMIZE=-O
+goto auto_detect
+
+:custom_settings
+echo.
 :: ===================================================
-:: DEVICE SELECTION (GPU/CPU)
+:: DEVICE SELECTION
+:: ===================================================
+echo ===================================================
+echo   STEP 1/2: SELECT DEVICE
+echo ===================================================
+echo.
+echo [1] AUTO - Let the script choose (Recommended)
+echo [2] GPU  - Force GPU only (Fast but needs GPU)
+echo [3] CPU  - Force CPU only (Very slow, may not work)
+echo.
+echo ===================================================
+set /p DEVICE_CHOICE="Your choice (1, 2, or 3): "
+echo ===================================================
+echo.
+
+if "%DEVICE_CHOICE%"=="2" (
+    set DEVICE_PARAM=-D 2
+    set MANUAL_DEVICE=1
+    set OPTIMIZE=-O
+    echo [+] GPU mode selected
+    echo.
+    timeout /t 1 /nobreak >nul
+) else if "%DEVICE_CHOICE%"=="3" (
+    set DEVICE_PARAM=-D 1
+    set MANUAL_DEVICE=1
+    set OPTIMIZE=
+    echo [+] CPU mode selected
+    echo [!] WARNING: This is 10-100x slower than GPU
+    echo [!] WARNING: May not work on some CPUs
+    echo.
+    timeout /t 2 /nobreak >nul
+) else (
+    set MANUAL_DEVICE=0
+    set OPTIMIZE=-O
+    echo [+] Auto detect selected
+    echo.
+    timeout /t 1 /nobreak >nul
+)
+
+echo.
+:: ===================================================
+:: ATTACK LEVEL SELECTION
+:: ===================================================
+echo ===================================================
+echo   STEP 2/2: SELECT ATTACK LEVEL
+echo ===================================================
+echo.
+echo [1] FAST     - Quick and common patterns only
+echo     Phases: Dictionary, Birthdate, 8 digits, Thai mobile
+echo     Time: 5-15 min (GPU) / 1-3 hours (CPU)
+echo.
+echo [2] STANDARD - Recommended for most cases
+echo     Everything in FAST + Rules, 9-digit numbers
+echo     Time: 30-60 min (GPU) / 4-10 hours (CPU)
+echo.
+echo [3] EXTENDED - More thorough, takes longer
+echo     Everything in STANDARD + 10-digit numbers
+echo     Time: 2-4 hours (GPU) / 1-2 days (CPU)
+echo.
+echo [4] EXTREME  - Maximum coverage, very slow
+echo     Everything in EXTENDED + 11-12 digit numbers
+echo     Time: 15-40 hours (GPU) / weeks (CPU)
+echo.
+echo ===================================================
+set /p ATTACK_LEVEL="Your choice (1, 2, 3, or 4): "
+echo ===================================================
+echo.
+
+if "%ATTACK_LEVEL%"=="1" (
+    echo [+] FAST attack selected
+    echo [+] Quick scan for common passwords
+    echo.
+    timeout /t 1 /nobreak >nul
+) else if "%ATTACK_LEVEL%"=="2" (
+    echo [+] STANDARD attack selected
+    echo [+] Good choice for most passwords
+    echo.
+    timeout /t 1 /nobreak >nul
+) else if "%ATTACK_LEVEL%"=="3" (
+    echo [+] EXTENDED attack selected
+    echo [!] This will take 2-4 hours on GPU
+    echo.
+    timeout /t 2 /nobreak >nul
+) else if "%ATTACK_LEVEL%"=="4" (
+    echo [+] EXTREME attack selected
+    echo [!] WARNING: This will take 15-40 hours on GPU
+    echo [!] WARNING: May take WEEKS on CPU
+    echo.
+    timeout /t 3 /nobreak >nul
+) else (
+    set ATTACK_LEVEL=2
+    echo [+] Invalid choice, using STANDARD attack
+    echo.
+    timeout /t 1 /nobreak >nul
+)
+
+if "%MANUAL_DEVICE%"=="1" goto start_cracking
+
+:auto_detect
+
+:: ===================================================
+:: AUTO DEVICE DETECTION
 :: ===================================================
 echo [*] Detecting available devices...
-hashcat.exe -I
 echo.
-echo ===================================================
-echo   SELECT PROCESSING DEVICE
-echo ===================================================
-echo.
-echo [1] GPU (Recommended - Fast, requires compatible GPU)
-echo [2] CPU (Slow, works on any system)
-echo [3] Auto (Let Hashcat decide)
-echo.
-set /p DEVICE_CHOICE="Select device (1/2/3): "
 
-if "%DEVICE_CHOICE%"=="1" (
+:: Get device info and save to temp file
+hashcat.exe -I > temp_devices.txt 2>&1
+
+:: Check for GPU (look for "Type" line containing "GPU")
+findstr /C:"Type" temp_devices.txt | findstr /C:"GPU" >nul 2>&1
+set GPU_FOUND=%errorlevel%
+
+if %GPU_FOUND%==0 (
     set DEVICE_PARAM=-D 2
-    echo [+] Using GPU mode
-) else if "%DEVICE_CHOICE%"=="2" (
+    set OPTIMIZE=-O
+    echo ===================================================
+    echo   AUTO-SELECTED: GPU MODE
+    echo ===================================================
+    echo.
+    echo [+] GPU detected - Using GPU acceleration
+    echo [+] This will be FAST (10-100x faster than CPU^)
+    echo.
+    echo [*] Device specifications:
+    type temp_devices.txt | findstr /C:"Name" /C:"Type" /C:"Processor" /C:"Memory"
+    echo.
+) else (
     set DEVICE_PARAM=-D 1
+    set OPTIMIZE=
+    echo ===================================================
+    echo   AUTO-SELECTED: CPU MODE
+    echo ===================================================
+    echo.
+    echo [!] No GPU detected - Using CPU mode
     echo [!] WARNING: CPU mode is 10-100x slower than GPU
     echo [!] Some phases may take hours or days to complete
-) else (
-    set DEVICE_PARAM=
-    echo [+] Using Auto mode
+    echo.
 )
-echo.
+
+:: Cleanup temp file
+del temp_devices.txt >nul 2>&1
 
 :: ===================================================
 :: CREATE THAI MOBILE PREFIX FILE
@@ -146,23 +317,40 @@ set DURATION=%dur_h%h %dur_m%m %dur_s%s
 goto :eof
 
 :start_cracking
+echo.
+echo ===================================================
+echo   STARTING CRACKING PROCESS
+echo ===================================================
+echo   Target: %HASHFILE%
+echo   Started: %date% %time%
+echo ===================================================
+echo.
+echo [*] Preparing attack files...
+echo.
 
 :: ===================================================
 :: PHASE 1: DICTIONARY ATTACK (ROCKYOU)
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 1: Dictionary Attack (rockyou.txt)
-echo Priority: CRITICAL [*****]
+echo   PHASE 1/4: DICTIONARY ATTACK
 echo ===================================================
-echo [*] Testing common passwords from rockyou.txt wordlist
-echo [*] Fastest method - catches weak/common passwords
-echo [*] Attack Mode: Straight dictionary (-a 0)
-echo [*] Estimated Time: 1-5 minutes (14M+ passwords)
+echo [*] Testing common passwords from rockyou.txt
+echo [*] This is the fastest method
+echo [*] Estimated: 1-5 minutes
+echo ===================================================
 echo.
 if exist rockyou.txt (
     echo [*] Running Phase 1...
-    hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
+    echo.
+    echo ===================================================
+    echo   KEYBOARD SHORTCUTS
+    echo ===================================================
+    echo   [S] = Show Status    [P] = Pause
+    echo   [B] = Bypass Phase   [Q] = Quit
+    echo ===================================================
+    echo.
+    hashcat.exe -m 22000 -a 0 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
     echo.
 ) else (
     echo [!] rockyou.txt not found - downloading...
@@ -170,7 +358,7 @@ if exist rockyou.txt (
     if exist rockyou.txt (
         echo [+] Download complete
         echo [*] Running Phase 1...
-        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
+        hashcat.exe -m 22000 -a 0 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt
         echo.
     ) else (
         echo [!] Download failed - skipping
@@ -185,16 +373,12 @@ if exist rockyou.txt (
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 2: Birthdate Patterns (DDMMYYYY)
-echo Priority: HIGH [****]
+echo   PHASE 2/4: BIRTHDATE PATTERNS
 echo ===================================================
-echo [*] Testing birthdate patterns in Thai and Western formats
-echo [*] Buddhist Era (B.E.): 2500-2599 (1957-2056 CE)
-echo [*] Christian Era (C.E.): 1900-1999, 2000-2099
-echo [*] Examples: 01012540, 15062550, 25121990, 01012000
-echo [*] Attack Mode: Mask attack with year patterns (-a 3)
-echo [*] Keyspace: 4 year ranges x ~3,650 dates = ~14,600 combinations per range
-echo [*] Estimated Time: 5-10 minutes
+echo [*] Testing Thai birthdate formats (DDMMYYYY)
+echo [*] Buddhist Era: 2500-2599, Christian Era: 1900-2099
+echo [*] Estimated: 5-10 minutes
+echo ===================================================
 echo.
 if not exist birthdate_patterns.txt (
     (
@@ -205,7 +389,15 @@ if not exist birthdate_patterns.txt (
     ) > birthdate_patterns.txt
 )
 echo [*] Running Phase 2...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% birthdate_patterns.txt
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% birthdate_patterns.txt
 echo.
 
 :: ===================================================
@@ -213,17 +405,23 @@ echo.
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 3: 8-Digit Numbers (00000000-99999999)
-echo Priority: HIGH [****]
+echo   PHASE 3/4: 8-DIGIT NUMBERS
 echo ===================================================
-echo [*] Testing all 8-digit numeric combinations
-echo [*] Common for: Simple numeric passwords, partial phone numbers, dates
-echo [*] Attack Mode: Mask attack (-a 3)
-echo [*] Keyspace: 100,000,000 combinations
-echo [*] Estimated Time: 10-30 minutes (depends on GPU)
+echo [*] Testing 00000000 to 99999999
+echo [*] Common for simple numeric passwords
+echo [*] Estimated: 10-30 minutes
+echo ===================================================
 echo.
 echo [*] Running Phase 3...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d
 echo.
 
 :: ===================================================
@@ -231,37 +429,52 @@ echo.
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 4: Thai Mobile Numbers (10 digits)
-echo Priority: HIGH [****]
+echo   PHASE 4/4: THAI MOBILE NUMBERS
 echo ===================================================
-echo [*] Testing Thai mobile phone number patterns
-echo [*] Prefixes: 061-069, 080-099 (AIS, DTAC, TrueMove H, True)
-echo [*] Examples: 0812345678, 0987654321, 0612345678
-echo [*] Attack Mode: Mask attack with prefix file (-a 3)
-echo [*] Keyspace: 29 prefixes x 10,000,000 = 290,000,000 combinations
-echo [*] Estimated Time: 30-60 minutes (depends on GPU)
+echo [*] Testing 10-digit Thai phone numbers
+echo [*] Prefixes: 061-069, 080-099 (AIS, DTAC, True)
+echo [*] Estimated: 30-60 minutes
+echo ===================================================
 echo.
 echo [*] Running Phase 4...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% thaiprefix.txt
 echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% thaiprefix.txt
+echo.
+
+:: Check attack level for Phase 5 (best66 rules)
+if "%ATTACK_LEVEL%"=="1" goto phase6
 
 :: ===================================================
 :: PHASE 5: DICTIONARY + BEST66 RULES
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 5: Dictionary + best66 Rules
-echo Priority: MEDIUM [***]
+echo   PHASE 5/6: DICTIONARY WITH RULES
 echo ===================================================
 echo [*] Testing dictionary with advanced mutations
-echo [*] Examples: Password123, admin@2024, Welcome!, p@ssw0rd
-echo [*] Attack Mode: Dictionary with rules (-a 0 -r)
-echo [*] Estimated Time: 30-60 minutes
+echo [*] Examples: Password123, admin@2024, p@ssw0rd
+echo [*] Estimated: 30-60 minutes
+echo ===================================================
 echo.
 if exist rockyou.txt (
     if exist rules\best66.rule (
         echo [*] Running Phase 5...
-        hashcat.exe -m 22000 -a 0 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt -r rules\best66.rule
+        echo.
+        echo ===================================================
+        echo   KEYBOARD SHORTCUTS
+        echo ===================================================
+        echo   [S] = Show Status    [P] = Pause
+        echo   [B] = Bypass Phase   [Q] = Quit
+        echo ===================================================
+        echo.
+        hashcat.exe -m 22000 -a 0 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% rockyou.txt -r rules\best66.rule
         echo.
     ) else (
         echo [!] rules\best66.rule not found - skipping
@@ -272,22 +485,120 @@ if exist rockyou.txt (
     echo.
 )
 
+:phase6
+
+:: Check attack level for Phase 6 (9-digit)
+if "%ATTACK_LEVEL%"=="1" goto completion_summary
+
 :: ===================================================
 :: PHASE 6: 9-DIGIT NUMBERS (LAST RESORT)
 :: ===================================================
 echo.
 echo ===================================================
-echo PHASE 6: 9-Digit Numbers (000000000-999999999)
-echo Priority: LOW [**]
+echo   PHASE 6/6: 9-DIGIT NUMBERS
 echo ===================================================
-echo [*] Testing all 9-digit numeric combinations
+echo [*] Testing 000000000 to 999999999
 echo [*] Last resort - exhaustive brute force
-echo [*] Attack Mode: Mask attack (-a 3)
-echo [*] Keyspace: 1,000,000,000 combinations
-echo [*] Estimated Time: 2-8 hours (depends on GPU)
+echo [*] Estimated: 2-8 hours
+echo ===================================================
 echo.
 echo [*] Running Phase 6...
-hashcat.exe -m 22000 -a 3 -O -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d
+echo.
+
+:: Check attack level for extended phases
+if "%ATTACK_LEVEL%"=="2" goto completion_summary
+
+:: ===================================================
+:: PHASE 7: 10-DIGIT NUMBERS (LEVEL 3+)
+:: ===================================================
+echo.
+echo ===================================================
+echo   PHASE 7: 10-DIGIT NUMBERS (EXTENDED MODE)
+echo ===================================================
+echo [*] Testing 0000000000 to 9999999999
+echo [*] Estimated: 20-80 hours
+echo ===================================================
+echo.
+echo [*] Running Phase 7...
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d?d
+echo.
+
+if "%ATTACK_LEVEL%"=="3" goto completion_summary
+echo [*] Running Phase 7...
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d?d
+echo.
+
+if "%ATTACK_LEVEL%"=="2" goto completion_summary
+
+:: ===================================================
+:: PHASE 8: 11-DIGIT NUMBERS (LEVEL 3)
+:: ===================================================
+echo.
+echo ===================================================
+echo   PHASE 8: 11-DIGIT NUMBERS (EXTREME MODE)
+echo ===================================================
+echo [*] Testing 00000000000 to 99999999999
+echo [*] Estimated: 8-33 days
+echo ===================================================
+echo.
+echo [*] Running Phase 8...
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d?d?d
+echo.
+
+:: ===================================================
+:: PHASE 9: 12-DIGIT NUMBERS (LEVEL 3)
+:: ===================================================
+echo.
+echo ===================================================
+echo   PHASE 9: 12-DIGIT NUMBERS (EXTREME MODE)
+echo ===================================================
+echo [*] Testing 000000000000 to 999999999999
+echo [*] Estimated: 83-333 days
+echo ===================================================
+echo.
+echo [*] Running Phase 9...
+echo.
+echo ===================================================
+echo   KEYBOARD SHORTCUTS
+echo ===================================================
+echo   [S] = Show Status    [P] = Pause
+echo   [B] = Bypass Phase   [Q] = Quit
+echo ===================================================
+echo.
+hashcat.exe -m 22000 -a 3 %OPTIMIZE% -w 4 --quiet %DEVICE_PARAM% %HASHFILE% ?d?d?d?d?d?d?d?d?d?d?d?d
 echo.
 
 :: ===================================================
@@ -299,13 +610,20 @@ call :calculate_duration
 
 echo.
 echo ===================================================
-echo      ALL PHASES COMPLETED
+echo   ALL PHASES COMPLETED
 echo ===================================================
+echo.
 echo [TIME] Duration: %DURATION%
 echo [STARTED] %START_TIME%
 echo [FINISHED] %END_TIME%
 echo.
-echo [*] Check results:
+echo ===================================================
+echo   CHECKING RESULTS...
+echo ===================================================
+echo.
 hashcat.exe -m 22000 --show %HASHFILE%
 echo.
-pause
+echo ===================================================
+echo   DONE - Press any key to exit
+echo ===================================================
+pause >nul

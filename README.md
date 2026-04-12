@@ -1,4 +1,4 @@
-# Hashcat WiFi Cracker - ฉบับไทย
+# Hashcat WiFi Cracker 
 
 เครื่องมือแคร็กรหัส WiFi อัตโนมัติที่ปรับแต่งสำหรับเน็ตไทยโดยเฉพาะ ใช้ Hashcat ในการทำงาน
 
